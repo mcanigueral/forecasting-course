@@ -1,0 +1,352 @@
+---
+title: "Data exploratory analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(dplyr)
+library(lubridate)
+library(purrr)
+library(tidyr)
+library(tsibble)
+library(feasts)
+library(evsim)
+library(ggplot2)
+library(fable)
+library(fable.prophet)
+library(forecast)
+load("data.RData")
+```
+
+
+This notebook aims to evaluate different models to forecast time series, from deterministic models to machine-learning. 
+
+The EV demand depends on different factors and variables, so we will test different type of models that allow us to use external variables as predictors for the model. The type of predictors that we use will depend on the type of model. 
+
+# Introduction
+
+## Example data used
+
+For training, we will use an example data set provided by package `tsibbledata`:
+
+```{r}
+head(tsibbledata::vic_elec)
+```
+
+In this example data set we have electricity `Demand` together with the `Temperature` and if that `Date` was a `Holiday` or not, from the 01/01/2012 to the 31/12/2014 in 30-minute resolution:
+
+```{r}
+summary(tsibbledata::vic_elec)
+```
+
+Is the temperature an important variable for this demand?
+
+Plot electricity demand against temperature using `ggplot` scatter plot:
+
+```{r}
+
+```
+
+The plot shows that there is a nonlinear relationship between the two, with demand increasing for low temperatures (due to heating) and increasing for high temperatures (due to cooling).
+
+Other important features for electricity demand are the calendar data. Therefore, on top of these variables, the extra predictors `Weekday` and `WorkingDay` can be created:
+
+```{r}
+elec <- tsibbledata::vic_elec %>%
+  mutate(
+    Weekday = wday(Time, week_start = 1),
+    WorkingDay = ifelse(wday(Time, week_start = 1) < 6, TRUE, FALSE)
+  )
+```
+
+Also, to properly evaluate the forecasting model we have to split the data set between the **train** and **test** sub-sets. Since it is chronological data, we will train the model with all data until September 2014, and we will test the model with the first day of September:
+
+```{r}
+# elec_train <- 
+# elec_test <- 
+```
+
+## EV data preparation
+
+Prepare our EV data and split the `ev_ts` data set to *train* and *test* sub-sets accordingly:
+
+```{r}
+
+```
+
+
+## Forecasting evaluation
+
+To evaluate the tests of our models we will use the following metrics:
+
+* **RMSE**: Root Mean Square Error
+
+$$
+\text{RMSE} = \sqrt{\frac{1}{n} \sum_{i=1}^n (\text{Actual}_i - \text{Predicted}_i)^2}
+$$
+```{r}
+rmse <- function(actual, predicted) {
+  sqrt(mean((actual - predicted)^2))
+}
+```
+
+* **MAE**: Mean Absolute Error
+
+$$
+\text{MAE} = \frac{1}{n} \sum_{i=1}^n \lvert \text{Actual}_i - \text{Predicted}_i \rvert
+$$
+```{r}
+mae <- function(actual, predicted) {
+  mean(abs(actual - predicted))
+}
+```
+
+* **MAPE**: Mean Absolute Percentage Error
+
+$$
+\text{MAPE} = \frac{100}{n} \sum_{i=1}^n \left\lvert \frac{\text{Actual}_i - \text{Predicted}_i}{\text{Actual}_i} \right\rvert
+$$
+```{r}
+mape <- function(actual, predicted) {
+  mean(abs((actual - predicted) / actual)) * 100
+}
+```
+
+
+
+
+
+
+# Deterministic models
+
+Complex seasonalities or correlations with external predictors are behaviours that result quite complex to model using methods like *Dynamic Regression*. In that sense, a better method is *Prophet*, which can be considered a nonlinear regression model where the knots (or changepoints) for the piecewise-linear trend are automatically selected using a Bayesian approach. 
+
+We will develop a Prophet model using `prophet()` function from package `fable.prophet`, first with the example data set and then with our own EV data.
+
+## Example data set
+
+We can build a Prophet model with a linear function of `Temperature` and `WorkingDay`, and harmonic regression terms (we set the orders of the season terms subjectively) to allow for the daily seasonal pattern:
+
+```{r}
+# ~ 3 minutes
+fit <- elec_train |>
+  model(
+    prophet(Demand ~ Temperature + WorkingDay +
+            season(period = "day", order = 10) +
+            season(period = "week", order = 5) +
+            season(period = "year", order = 3))
+  )
+```
+
+Forecasting with models that use external predictors is difficult because we require future values of the predictor variables (for example `Temperature` forecast). In this example, we can assume that the forecast of temperature was exactly the actual temperature using directly the `elec_test` sub-set in the function `forecast()`:
+
+```{r}
+fc <- fit %>%
+  forecast(new_data = elec_test)
+```
+
+And use the `autoplot()` function to plot the forecast results and the *prediction intervals*:
+
+```{r}
+
+```
+
+The prediction values can be accessed from the forecasting results:
+
+```{r}
+results <- elec_test %>% 
+  select(Time, actual = Demand) %>% 
+  mutate(predicted = fc$.mean)
+```
+
+
+And if we calculate the *forecasting errors*:
+
+```{r}
+metrics_table <- tibble(
+  Metric = c("RMSE (kW)", "MAE (kW)", "MAPE (%)"),
+  Value = c(
+    rmse(results$actual, results$predicted), 
+    mae(results$actual, results$predicted), 
+    mape(results$actual, results$predicted)
+  )
+)
+print(metrics_table)
+```
+
+Although the short-term forecasts look reasonable, this is a crude model for a complicated process. The residuals demonstrate that there is a lot of information that has not been captured with this model and there is still substantial remaining autocorrelation in the residuals, so the prediction intervals would be narrower if the autocorrelations were taken into account.
+
+```{r}
+fit %>% gg_tsresiduals()
+```
+
+
+**Exercise:** introduce the autocorrelation of the `Demand` variable to the Prophet model. Does it improve the results?
+
+```{r}
+
+```
+
+
+
+## Prophet EV model
+
+Make a prophet model of our EV demand following the steps seen in the previous example:
+
+```{r}
+
+```
+
+What is the accuracy of the forecasting?
+
+```{r}
+
+```
+
+
+What is the distribution of residuals?
+
+```{r}
+
+```
+
+
+
+# RandomForest
+
+We have seen that the nonlinearities and relationships between variables that we have seen from our data sets are a true challenge for the Deterministic modelling methods. In that sense, machine-learning methods offer better results in learning patterns in data without explicit assumptions. 
+
+One of the most used machine-learning methods is **Random Forest**, which consists on decision trees combined in an ensemble using **bagging** to reduce variance (and increase accuracy) while preventing overfitting.
+
+For that purpose we will use package `randomForest`:
+
+```{r}
+library(randomForest)
+```
+
+
+
+## Example data set
+
+We will work first with the example data set used in last section. However, this time we will include the information about different time cycles and seasonalities with an extra feature for the `Hour` of the day:
+
+```{r}
+elec <- elec %>% 
+  mutate(
+    Hour = hour(Time) + minute(Time)/60
+  )
+head(elec)
+```
+
+We will also forecast the 1st September like the previous example:
+
+```{r}
+elec_train <- elec %>% filter(Time < dmy(01092014))
+elec_test <- elec %>% filter(date(Time) == dmy(01092014))
+```
+
+We can train the random forest model with function `randomForest()` and the predictors that we want to use:
+
+```{r}
+rf_model <- randomForest(
+  Demand ~ Temperature + Holiday + Weekday + WorkingDay + Hour,
+  data = elec_train,
+  ntree = 500,  # Number of trees
+  mtry = 2      # Number of features to consider at each split
+)
+
+print(rf_model)
+```
+
+Once we have our model we can test it and obtain predictions with test data:
+
+```{r}
+predictions <- predict(rf_model, newdata = elec_test)
+
+results <- elec_test %>% 
+  select(Time, actual = Demand) %>% 
+  mutate(
+    predicted = predictions
+  )
+
+results %>%
+  pivot_longer(-Time) %>%
+  ggplot(aes(x = Time, y = value, color = name)) +
+  geom_line() +
+  labs(title = "Random Forest Forecast: Actual vs Predicted",
+       x = "Time", y = "Power Demand")
+```
+
+Now we can calculate the different accuracy metrics:
+
+```{r}
+metrics_table <- tibble(
+  Metric = c("RMSE (kW)", "MAE (kW)", "MAPE (%)"),
+  Value = c(
+    rmse(results$actual, results$predicted), 
+    mae(results$actual, results$predicted), 
+    mape(results$actual, results$predicted)
+  )
+)
+print(metrics_table)
+```
+
+Does it perform better than the deterministic model?
+
+
+
+In a random forest model, calculating prediction intervals is not straightforward because it doesn't inherently provide a probabilistic output or a variance estimate for predictions. However, we can estimate the intervals with the **standard deviation** of our forecasting errors *assuming that the errors are normally distributed*. 
+
+Check that the distribution of forecasting errors is normal:
+
+```{r}
+
+```
+
+So, the prediction intervals for the 95% of confidence would be:
+
+```{r}
+# results_interval <- results %>% 
+#   mutate(
+#     Lower = ,
+#     Upper = 
+#   )
+```
+
+```{r}
+results_interval %>% 
+  ggplot(aes(x = Time)) +
+  geom_line(aes(y = actual), color = "black", alpha = 0.6) +  # Actual points
+  geom_line(aes(y = predicted), color = "blue") +  # Predicted line
+  geom_ribbon(aes(ymin = Lower, ymax = Upper), fill = "blue", alpha = 0.5) +  # Shaded interval
+  labs(title = "Random Forest Forecast: Actual vs Predicted",
+       x = "Time", y = "Power Demand") + 
+  theme_minimal()
+```
+
+
+Now try to add features `LastDaySameHour` and `LastWeekSameDaySameHour` to see if we can improve the accuracy:
+
+```{r}
+
+```
+
+
+## RandomForest EV model
+
+Repeat the random forest exercise with our custom EV data:
+
+```{r}
+
+```
+
+What is the accuracy of the forecasting?
+
+```{r}
+
+```
+
+Is it better than the deterministic models?
+
+

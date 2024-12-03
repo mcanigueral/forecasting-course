@@ -1,0 +1,117 @@
+---
+title: "Data preparation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(lubridate)
+library(purrr)
+library(tidyr)
+library(ggplot2)
+library(feasts)
+library(fable)
+load("data.RData")
+```
+
+
+This notebook aims to perform statistic analysis to explore the data and extract insights about the most suitable type of forecasting model required in this project.
+
+# Data exploratory analysis
+
+## Visualization
+
+Plot our target variable with function `ggplot2::autoplot()`, and adjust it if necessary:
+
+```{r}
+
+```
+
+Use the functions from `feasts` package that you think that could provide more interesting visualizations (e.g. `gg_subseries()` or `gg_season()`). 
+
+```{r}
+
+```
+
+
+
+## Statistic summary
+
+First, print a quick summary of our data frame with function `summary()`:
+
+```{r}
+
+```
+
+
+Plot the histogram of every variable in a facet plot with `ggplot2`. For that, you will have to convert the data frame into a **tidy data frame** (with the names of the variables in one column, and the corresponding values in another column):
+
+```{r}
+
+```
+
+
+
+## Correlation
+
+If you think any independent variable could be correlated with our dependent variable `y`, make a single scatter plot with `ggplot2` to take a deeper look:
+
+```{r}
+
+```
+
+
+
+## Autocorrelation
+
+Plot the **correlogram** of our target variable using function `ACF()` combined with `autoplot()`:
+
+```{r}
+
+```
+
+Answer the following questions:
+
+* Is there any autocorrelation?
+* Is there any seasonality? Which periods do you detect?
+* Is there any trend?
+
+Try different time resolutions form the `index` in our tsibble, since the `lag` in the `ACF()` function depends on this.
+
+```{r}
+
+```
+
+After analysing the trend and seasonality from the *correlogram*. Could you think on any other variable that could be interesting as predictor?
+
+Add it in our `ev_ts` data frame:
+
+```{r}
+
+```
+
+
+
+## Decomposition
+
+Do you think that the decomposition will be relevant for our target variable?
+
+
+
+Obtain the different decomposition components using functions `STL()` and `components()`, according to the different seasonality periods detected in last section. Then, plot the decomposition components using function `autoplot()`:
+
+```{r}
+
+```
+
+
+Try applying now a logarithmic transformation to see if the decomposition changes:
+
+```{r}
+
+```
+
+Does it have sense to apply a logarithmic transformation in our target variable?
+
+

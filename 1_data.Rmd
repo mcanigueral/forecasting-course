@@ -1,0 +1,150 @@
+---
+title: "Data preparation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(dplyr)
+library(lubridate)
+library(evsim)
+library(tsibble)
+```
+
+
+This notebook aims to describe the main objectives of this forecasting exercises and prepare the energy data sets that will be used in the next notebooks where **forecasting** will be applied. 
+
+# Problem description
+
+Fist of all, it is very important to describe the context and environment of our forecasting project. Answer the following questions to describe the problem appropriately:
+
+* Who requires the forecast?​
+
+* Which is the objective of the forecast?
+
+* What is our dependent variable?
+
+* What are our independent variables?
+
+* How will we get the data?​
+
+* Do we have access to real-time data?​
+
+* In which frequency do we get data?​
+
+* Is the accuracy very important?​
+
+* Do we have to consider a specific trend in our data?
+
+* Do we have to consider a specific seasonality in our data?
+
+* Which predictors will have more influence over our target variable?
+
+
+
+
+# Data preparation
+
+This course aims to use custom data sets for all exercises, so below there's the code that pretends to read the data sets.
+
+## EV sessions simulation
+
+To simulate smart charging, the first thing we need is a data set of charging sessions. Create a custom EV model for the study case of this project using `evsim` function `evsim::get_custom_ev_model`. Remember that you have to configure the parameters of your EV user profiles in a list of tibbles (argument `parameters_lst`). You can create this list manually in this notebook or by reading the multiple workseets of an Excel file (for that you can use functions `purrr::map()`, `readxl::excel_sheets()` and `readxl::read_excel()`):
+
+```{r}
+# ev_model <- 
+```
+
+
+Create a custom EV charging sessions data set using `evsim` function `evsim::simulate_sessions()`. Choose the scenario you want to simulate, but a high-demand scenario is advised to better assess the impact of EV charging and the potential benefits of smart charging. Describe the corresponding chosen scenario.
+
+- Number of sessions per day: 
+- Charging power distribution: 
+- Dates: 
+- User profiles: 
+
+```{r}
+# ev_sessions <- 
+```
+
+
+Get the time-series EV demand **of every charging session** using `evsim` function `evsim::get_demand()`.
+
+```{r}
+# ev_demand <- 
+```
+
+
+Plot the time-series EV demand of the simulated charging sessions using `evsim` function `evsim::plot_ts()`.
+
+```{r}
+
+```
+
+
+*Which the EV user profile with more flexibility potential? Why?* 
+
+From now on, we will focus on this user profile to build the forecasting models and test them. Build a `tsibble` data frame with the `datetime` column as index and the `y` column with the load of the selected user profile:
+
+```{r}
+# ev_ts <- 
+```
+
+
+# Forecasting data
+
+From our object `ev_ts`, the `y` column is our target or *dependent variable*. However, we have to construct our `X` matrix with all the predictors or *independent variables*. 
+
+Mutate the `ev_ts` object with all independent variables that could influence to our objective variable:
+
+```{r}
+
+```
+
+
+
+# Tidy data
+
+For proper forecasting we should avoid the following situations:
+
+* Gaps in data
+* Including periods with behaviour that differ from the future (e.g. covid)
+
+Check if we have any gap (i.e. `NA` values) in our data set `ev_ts`:
+
+```{r}
+
+```
+
+If we do have gaps decide whether to remove the corresponding rows or fill the gaps with prevalent data. Remember that you can use functions from `tidyr` or `padr` packages.
+
+```{r}
+
+```
+
+
+From the current variables, could you think on some transformations (e.g. log, normalization, etc.) that could help in our forecasts? 
+
+If any, list them:
+
+* 
+* 
+
+Now create these new features and include them in our tidy data frame.
+
+```{r}
+
+```
+
+
+
+# Save data
+
+Finally, save the environment in a file:
+
+```{r}
+save.image(file = "data.RData")
+```
+
+
+
